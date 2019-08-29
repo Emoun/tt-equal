@@ -1,6 +1,10 @@
 tt-equal
 =============================
 
+[![Build Status](https://api.travis-ci.org/Emoun/tt-equal.svg?branch=master)](https://travis-ci.org/Emoun/tt-equal)
+[![Latest Version](https://img.shields.io/crates/v/tt-equal.svg)](https://crates.io/crates/tt-equal)
+[![Rust Documentation](https://img.shields.io/badge/api-rustdoc-blue.svg)](https://docs.rs/tt-equal/0.1/tt_equal/)
+
 **This library is an entry in the [`tt_call`](https://crates.io/crates/tt-call) series of modular interoperable tt-muncher building blocks.**
 
 Inludes the procedural macro `tt_equal` that acts as a predicate for whether two token trees are equal. 
