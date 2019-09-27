@@ -1,5 +1,5 @@
 extern crate proc_macro;
-use proc_macro::{Delimiter, Group, TokenStream, TokenTree};
+use proc_macro::{token_stream::IntoIter, Delimiter, Group, Spacing, TokenStream, TokenTree};
 use std::iter::FromIterator;
 
 ///
@@ -99,11 +99,19 @@ use std::iter::FromIterator;
 pub fn tt_equal(item: TokenStream) -> TokenStream {
     let (caller, lhs, rhs) = validate(item);
 
-    if lhs.to_string() == rhs.to_string() {
-        return return_to_tt(caller, true);
-    } else {
-        return return_to_tt(caller, false);
-    }
+    assert!(lhs.len() > 0);
+    assert!(rhs.len() > 0);
+
+    return_to_tt(
+        caller,
+        if lhs.len() == rhs.len() {
+            lhs.into_iter()
+                .zip(rhs.into_iter())
+                .all(|(lhs, rhs)| lhs.to_string() == rhs.to_string())
+        } else {
+            false
+        },
+    )
 }
 
 ///
@@ -112,7 +120,7 @@ pub fn tt_equal(item: TokenStream) -> TokenStream {
 /// 1. The left-hand side of the input to compare
 /// 2. The right-hand side of the input to compare
 ///
-fn validate(item: TokenStream) -> (TokenTree, TokenTree, TokenTree) {
+fn validate(item: TokenStream) -> (TokenTree, Vec<TokenTree>, Vec<TokenTree>) {
     let mut iter = item.into_iter();
 
     let caller = iter
@@ -156,14 +164,16 @@ fn validate(item: TokenStream) -> (TokenTree, TokenTree, TokenTree) {
         )
     }
     let mut clean_value = expect_group(braced_group, Delimiter::Brace).into_iter();
-    let lhs = clean_value
-        .next()
+    let lhs = get_next_joint_token(&mut clean_value)
         .expect("'tt_equal' expects two token tree to compare but received none.");
-    let rhs = clean_value
-        .next()
-        .expect("'tt_equal' expects two token tree to compare but received only one.");
-    if clean_value.next().is_some() {
-        panic!("'tt_equal' expects two token tree to compare but received more.")
+
+    let rhs = get_next_joint_token(&mut clean_value)
+        .expect("'tt_equal' expects two token tree to compare but received only one");
+    if let Some(x) = clean_value.next() {
+        panic!(
+            "'tt_equal' expects two token tree to compare but received more: '{:?} {:?} {:?}'",
+            lhs, rhs, x
+        )
     }
     (caller, lhs, rhs)
 }
@@ -215,4 +225,39 @@ fn return_to_tt(caller: TokenTree, b: bool) -> TokenStream {
     result.push(return_call_argument);
 
     return TokenStream::from_iter(result.into_iter());
+}
+
+///
+/// Tries to get the next token from the token stream iterator.
+///
+/// If no token is available, `None` is returned.
+///
+/// If the token is a multi-character punctuation, all the token in the punctuation are turned.
+/// I.e:
+///   * '+' will be returned as `Vec['+']`.
+///   * `+=` will be returned as `Vec['+', '=']`.
+///   * `..=` will be returned as `Vec['.', '.', '=']`.
+///
+/// For non-punctuation tokens, the vec will always contain 1 token.
+///
+fn get_next_joint_token(stream: &mut IntoIter) -> Option<Vec<TokenTree>> {
+    let first = stream.next()?;
+    if let TokenTree::Punct(last) = first {
+        let mut tokens = vec![last];
+        while let Spacing::Joint = tokens.last().unwrap().spacing() {
+            let next = stream.next().unwrap();
+            if let TokenTree::Punct(p) = next {
+                tokens.push(p);
+            } else {
+                panic!(
+                    "'tt_equal' encountered a Punct token joint with \
+                     a non-Punct token: '{:?} {:?}'",
+                    tokens, next
+                );
+            }
+        }
+        Some(tokens.into_iter().map(|p| TokenTree::Punct(p)).collect())
+    } else {
+        Some(vec![first])
+    }
 }
