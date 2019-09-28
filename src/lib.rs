@@ -107,7 +107,7 @@ pub fn tt_equal(item: TokenStream) -> TokenStream {
         if lhs.len() == rhs.len() {
             lhs.into_iter()
                 .zip(rhs.into_iter())
-                .all(|(lhs, rhs)| lhs.to_string() == rhs.to_string())
+                .all(|(lhs, rhs)| lhs.to_string().trim() == rhs.to_string().trim())
         } else {
             false
         },
